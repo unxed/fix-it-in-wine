@@ -73,6 +73,10 @@ The tests need no network and no real Wine. CI runs them.
 
 BSD-3-Clause. See [LICENSE](LICENSE).
 
+## Showcases
+
+- [WineHQ bug 59609](showcases/59609/README.md): FastStone's thumbnail strip — the fix from the ticket, built as one DLL, enabled for one program, checked against real Windows in CI.
+
 ## Related work
 
 - Martin Alderson, [Using agents and Wine to move off Windows](https://martinalderson.com/posts/using-agents-and-wine-to-move-off-windows/) (2026-03-17): an agent got a Windows program working under Wine (a stub DLL built with mingw, binary patches, many test rounds).

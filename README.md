@@ -50,6 +50,7 @@ tools/pe_unmark.py        clears the "Wine builtin DLL" mark of a PE file
 tools/build_one_dll.sh    builds one DLL from a Wine tag, branch or commit
 tools/wineprobe.py        runs a program with debug channels, prints a short digest of the log
 tools/winebugs.py         read-only WineHQ Bugzilla client: search, show, attachments
+tools/catalog.py          read-only search in the dllmgr catalog of fixes: by program, DLL, bug, words
 tools/override.py         enables one DLL for one program in one prefix; apply, undo, status
 tests/                    unit tests of the tools
 ```

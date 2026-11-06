@@ -44,6 +44,10 @@ jobs:
   wine:
     needs: build
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        wine: [ubuntu, winehq-stable, winehq-devel]
     env:
       WINEDEBUG: -all
       FIW_WINE_GIT: https://github.com/wine-mirror/wine.git
@@ -54,10 +58,20 @@ jobs:
         with:
           name: lvpos
           path: bin
-      - name: Install Wine from Ubuntu and the build packages
+      - name: Install Wine (${{ matrix.wine }}) and the build packages
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq wine wine64 xvfb git gcc make flex bison gcc-mingw-w64-i686 gcc-mingw-w64-x86-64
+          sudo apt-get install -y -qq xvfb git gcc make flex bison gcc-mingw-w64-i686 gcc-mingw-w64-x86-64
+          if [ "${{ matrix.wine }}" = ubuntu ]; then
+            sudo apt-get install -y -qq wine wine64
+          else
+            sudo dpkg --add-architecture i386
+            sudo mkdir -pm755 /etc/apt/keyrings
+            sudo wget -qO /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+            sudo wget -qNP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/noble/winehq-noble.sources
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --install-recommends ${{ matrix.wine }}
+          fi
           wine --version
       - name: Showcase on Wine (before, build with fix.patch, after, undo)
         run: |
@@ -69,5 +83,5 @@ jobs:
           grep -m1 '^#arch=' "$WINEPREFIX/system.reg"
           bash showcases/59609/run.sh bin 2>&1 | tee result.txt
           rc=${PIPESTATUS[0]}
-          { echo '```'; tail -n 4 result.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          { echo "### ${{ matrix.wine }}"; echo '```'; tail -n 4 result.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $rc

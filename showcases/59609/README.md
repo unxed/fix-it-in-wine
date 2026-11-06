@@ -66,18 +66,23 @@ Wine tags listed in its `SOURCE.txt` plus `fix.patch`.
 
 ## Results
 
-First run (workflow run 42155031164, 2026-11-06):
+Workflow run [42156695927](https://github.com/unxed/fix-it-in-wine/actions/runs/42156695927)
+(2026-11-06), icon view, item 150, scroll by 300 pixels:
 
-- **Windows** (`windows-latest`, comctl32 5.82 and 6.16): in icon and small-icon view the item
-  position does not change after a 300-pixel scroll — view coordinates, as documented.
-- **Wine 9.0 (Ubuntu), builtin comctl32:** icon view `(2155,4) -> (1855,4)` — client
-  coordinates: bug 59609.
-- **The same Wine with comctl32 built from wine-9.0 with `fix.patch`**, enabled for the
-  reproducer only: icon view `(2155,4) -> (2155,4)` — view coordinates, both through the system
-  directory (v5) and through the winsxs copy (v6). Undo brings the bug back.
-- **Also seen, not part of 59609:** in small-icon view Wine re-arranges the items when the view
-  scrolls (`y` 42 -> 84, with and without the fix); `LVM_GETORIGIN` after scrolling right by 300
-  returns `(300,0)` on Windows and `(-300,0)` on Wine.
+| Where | Builtin comctl32 | comctl32 built with `fix.patch` | After undo |
+| --- | --- | --- | --- |
+| Windows (`windows-latest`, comctl32 5.82 and 6.16) | `(2171,2) -> (2171,2)`: view coordinates | — | — |
+| Wine 9.0 (Ubuntu) | `(2155,4) -> (1855,4)`: client coordinates, v5 and v6 | `(2155,4) -> (2155,4)`, v5 and v6 | bug back |
+| Wine 11.0 (WineHQ stable) | same as 9.0 | same as 9.0 | bug back |
+| Wine 11.21 (WineHQ devel) | same as 9.0 | same as 9.0 | bug back |
 
-That run reported exit code 2 on Wine, because the reproducer then compared both axes; it now
-judges the scroll axis and prints a change of `y` as a note. WineHQ stable and devel: pending.
+On Wine 11 the v6 case goes through the separate `comctl32_v6` module in the winsxs slot; it
+works the same way.
+
+Also seen, not part of 59609:
+- in small-icon view Wine re-arranges the items when the view scrolls (`y` of the item changes),
+  with and without the fix;
+- `LVM_GETORIGIN` after scrolling right by 300 returns `(-300,0)` on Wine 9.0 and `(300,0)` on
+  Windows and on Wine 11.
+
+Draft comment for the WineHQ ticket: [report.md](report.md) (not posted).

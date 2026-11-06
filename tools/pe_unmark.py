@@ -68,6 +68,42 @@ def pe_machine(data):
     return MACHINES.get(machine, f"other:0x{machine:04x}")
 
 
+def pe_export_name(data):
+    """Name in the export directory (e.g. "comctl32_v6.dll"), or None if there is none.
+
+    Wine 11 builds common controls 6 as a separate module, comctl32_v6, whose winsxs copy is
+    named comctl32.dll: the export name tells which module a file really is.
+    """
+    e_lfanew = _e_lfanew(data)
+    try:
+        if data[e_lfanew:e_lfanew + 4] != b"PE\0\0":
+            raise NotPE("no PE signature")
+        nsec, = struct.unpack_from("<H", data, e_lfanew + 6)
+        optsz, = struct.unpack_from("<H", data, e_lfanew + 20)
+        opt = e_lfanew + 24
+        magic, = struct.unpack_from("<H", data, opt)
+        rva, _size = struct.unpack_from("<II", data, opt + (96 if magic == 0x10B else 112))
+        if not rva:
+            return None
+        sections = [struct.unpack_from("<8sIIII", data, opt + optsz + i * 40) for i in range(nsec)]
+
+        def offset(r):
+            for _name, vsize, va, rawsize, rawptr in sections:
+                if va <= r < va + max(vsize, rawsize) and r - va < rawsize:
+                    return rawptr + r - va
+            return None
+
+        exp = offset(rva)
+        if exp is None:
+            return None
+        name = offset(struct.unpack_from("<I", data, exp + 12)[0])
+        if name is None:
+            return None
+        return data[name:data.index(b"\0", name)].decode("ascii", "replace")
+    except (struct.error, ValueError) as e:
+        raise NotPE("broken PE headers: %s" % e)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Clear the Wine builtin mark of a PE file.")
     ap.add_argument("src")

@@ -44,8 +44,11 @@ tag=$(wine --version | cut -d' ' -f1)
 # module, comctl32_v6, whose winsxs copy is named comctl32.dll.
 if grep -a -q 'Microsoft.Windows.Common-Controls' "$exe"; then
     slot="sxs:${sx}_microsoft.windows.common-controls_6595b64144ccf1df_6.*"
-    mod=comctl32
-    ls "$WINEPREFIX"/drive_c/windows/*/comctl32_v6.dll >/dev/null 2>&1 && mod=comctl32_v6
+    # The file we replace tells which module it is: its export name is comctl32_v6.dll on Wine 11.
+    cur=$(find "$WINEPREFIX"/drive_c/windows/winsxs -maxdepth 2 -ipath "*/${sx}_microsoft.windows.common-controls_6595b64144ccf1df_6.*/comctl32.dll" 2>/dev/null)
+    [ "$(printf '%s\n' "$cur" | grep -c .)" = 1 ] || { echo "expected one winsxs comctl32.dll, found: ${cur:-none}" >&2; exit 2; }
+    mod=$(python3 -c 'import sys; sys.path.insert(0, sys.argv[1]); import pe_unmark; n = pe_unmark.pe_export_name(open(sys.argv[2], "rb").read()) or ""; print(n.lower().removesuffix(".dll"))' "$tools" "$cur")
+    case $mod in comctl32|comctl32_v6) ;; *) echo "$cur: unexpected module '$mod'" >&2; exit 2 ;; esac
 else
     slot=system mod=comctl32
 fi

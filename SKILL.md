@@ -126,6 +126,8 @@ tools/winebugs.py get-attachment 67890 -o /tmp/fix.patch
 
 Search by program name, then by DLL and symptom words. Read the candidates with `show`. Look for a patch (`attachments` marks patches with `[patch]`; obsolete ones are hidden unless you pass `--all`) and for a merge request link in the comments. If a ticket matches, tell the user the number and the summary. If nothing matches, say so. Attachment download is plain Bugzilla 5 REST and is not confirmed on WineHQ yet: if it fails, report the error and use the link in the ticket.
 
+If there is no upstream bug yet, the fix can be catalogued in dllmgr under a dllmgr issue id: `dllmgr-<N>`, with the bug URL `https://github.com/unxed/dllmgr/issues/N`. Rename it when a WineHQ report is filed.
+
 ### 5. Build the DLL
 
 ```
@@ -147,6 +149,10 @@ tools/build_one_dll.sh REF DLL
 ```
 
 Only changed files are rebuilt. If `git apply` fails, the patch does not fit this tag. Try the tag the patch was made for, or report it.
+
+- Never edit the hunk headers of a unified diff by hand. Apply the existing patch to a pristine tree, edit the source, and regenerate the patch with `git diff`.
+- Apply all patches selected for one module to the same pristine tree before building. A fix set builds each module once.
+- A CI run reported as "cancelled" may mean only that one matrix job hit its timeout. Read the per-job conclusions and the artifacts before you discard the run.
 
 For comctl32 in Wine 11 there are two modules: `comctl32` and `comctl32_v6`. Build the one the program loads (step 3). Build both if unsure.
 
@@ -205,6 +211,13 @@ The digest must show `dll comctl32: native <path in the slot>`. If it shows `bui
 - Fixed: go to step 9.
 - Not fixed, or worse: run the undo command, or iterate (another tag, another patch, another DLL). Do not leave a failed change in place.
 
+Measuring from outside:
+
+- Under Wine, `GetScrollInfo` on a window of another process returns FALSE: the scroll state lives in the owner process's user32. An external observer then logs no scroll position, without any error.
+- Measure scrolling by reading item 0's rectangle with `LVM_GETITEMRECT`, through memory allocated in the target process (`VirtualAllocEx`, `WriteProcessMemory`, `ReadProcessMemory`). For a 32-bit target keep the buffer below 4 GB.
+- Before you conclude "it did not move", check that the measurement fields are present in the log.
+- Compare screenshots by cropping the same region from the baseline, the candidate and the Windows captures at the same DPI. Describe concrete differences: which element crosses which frame.
+
 ### 8. Order of fix methods
 
 Use the first that works:
@@ -223,6 +236,8 @@ These cannot be replaced with the tools above: DLLs that have a unix part, and c
 ### 9. Minimal reproducer (when you write your own fix or a report)
 
 Write a small C program (mingw) that shows the bug without the application: create the control, send the message, print the result, return a non-zero exit code on the bug. Run it before and after the fix. It is the proof of the bug and the base of the test in the report.
+
+Wine constants are often calibrated on default sizes. Example: `LISTVIEW_SCROLL_ICON_LINE_SIZE = 37` is half of the default 74-pixel icon spacing. Native v6 scrolls lines × (item spacing on that axis) / 2 per wheel detent, so with 138×144 cells Wine was about 12× slower at 192 DPI. A fixture with default 32×32 icons passes either way. Calibrate against Windows with the application's real sizes and DPI, and put a non-default size in the fixture.
 
 ### 10. Report
 
@@ -259,3 +274,5 @@ The PR says what happened, what to change, and on which case it showed up. Write
 Opening a PR is a post to the internet. For a PR to the skill's own repository this is part of the skill, but if the PR text contains anything from the user's machine, remove it first.
 
 If a PR is not possible (no GitHub access), save the proposal to `~/.cache/fix-it-in-wine/proposals/<date>.md` (create the directory) and tell the user where it is.
+
+In Claude Code cloud sessions GitHub GraphQL is blocked: use `gh api` REST. Issues of repositories that are not attached to the session cannot be read with `gh`: read the public web page instead.

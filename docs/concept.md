@@ -158,6 +158,7 @@ dllmgr does not exist yet. The repository contains tools that cover the first it
 | `tools/build_one_dll.sh` | Builds one or more DLLs from a Wine tag, branch or commit, without building all of Wine (section 5). Needs the build packages. |
 | `tools/wineprobe.py` | Runs a program with a debug preset and prints a short digest of the log: which DLLs were loaded and as what, missing imports, exceptions, errors, most frequent fixmes. |
 | `tools/winebugs.py` | A read-only client of the WineHQ Bugzilla REST API: search, show a bug, list and download attachments. |
+| `tools/catalog.py` | A read-only search in the [dllmgr catalog](https://github.com/unxed/dllmgr/tree/main/catalog) of fixes (one entry per bug): by program, DLL, bug or words. The skill runs it before building anything. |
 | `tools/override.py` | Enables one DLL for one program in one prefix, reversibly: `apply`, `undo`, `status`. |
 
 `tools/override.py` and `tools/wineprobe.py` are stand-ins. When dllmgr exists, it replaces them: `dllmgr diag` replaces `wineprobe.py`, and dllmgr's apply and undo replace `override.py`. Whether `pe_unmark.py`, `build_one_dll.sh` and `winebugs.py` stay is decided when dllmgr is written.

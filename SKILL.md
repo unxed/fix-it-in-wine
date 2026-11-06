@@ -54,6 +54,18 @@ Preflight, before any run:
 - program architecture: `python3 -c "import sys; sys.path.insert(0, 'tools'); import pe_unmark; print(pe_unmark.pe_machine(open(sys.argv[1], 'rb').read()))" EXE.exe` (run from this skill's directory);
 - if the program needs .NET or Mono, it is installed in the prefix (ask the user how they installed it).
 
+### 1a. Look for a ready fix
+
+Before any run, search the [dllmgr catalog](https://github.com/unxed/dllmgr/tree/main/catalog) of fixes (one entry per bug):
+
+```
+tools/catalog.py search --program NAME.exe
+tools/catalog.py search --dll comctl32 toolbar
+tools/catalog.py show winehq-59609
+```
+
+If an entry matches the program and the symptom, read it with `show`. It gives the bug, the DLLs, the patch, how to build it and, when present, prebuilt files and a one-step apply. Tell the user which entry it is. Then use it: build with the entry's patch (step 5) or take its prebuilt files (check the sha256), enable (step 6), verify (step 7). If nothing matches, go on with step 2.
+
 ### 2. Baseline digest
 
 Run the program once with the default preset and a timeout:

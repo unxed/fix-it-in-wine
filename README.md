@@ -9,9 +9,9 @@ A skill for AI agents. A Windows program misbehaves under Wine on your Linux mac
 5. enables the DLL for that program only, in that prefix only, with a one-step rollback;
 6. offers an upstream report: a new bug or a comment in an existing ticket.
 
-You do three things: log in to WineHQ Bugzilla, confirm the result by eye, and approve sending. Nothing is posted without your yes. The system Wine is never modified.
+You do three things: log in to WineHQ Bugzilla, confirm the result by eye, and approve sending. Nothing is posted without your yes. The report is text: Wine does not accept LLM-generated code, so the code the agent writes stays on your machine and in the dllmgr catalog. The system Wine is never modified.
 
-The design is in [docs/concept.md](docs/concept.md). The instructions for the agent are in [SKILL.md](SKILL.md).
+Why it exists: [docs/vision.md](docs/vision.md). The design is in [docs/concept.md](docs/concept.md). The instructions for the agent are in [SKILL.md](SKILL.md).
 
 ## Status
 

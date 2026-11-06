@@ -31,9 +31,10 @@ The job is done only when all of these hold:
 3. Every change is reversible and limited to one program in one prefix. Use `tools/override.py` only. Do not edit prefix files by hand.
 4. Never modify the system Wine installation. Do not install, remove or patch Wine packages. Builds go to the work directory (`~/.cache/fix-it-in-wine`, or `FIW_WORK`).
 5. Never post anything to the internet without the user's explicit yes: not a new bug, not a comment. Show the exact text first. Wait for the answer.
-6. Clean room. Never disassemble Microsoft DLLs. Never use leaked Microsoft code. Allowed sources: Microsoft documentation, Wine sources and tests, behaviour you observe.
+6. Clean room, following Wine's [Clean Room Guidelines](https://gitlab.winehq.org/wine/wine/-/wikis/Clean-Room-Guidelines). Study Windows only as a black box: test programs that call the API and check results, run on Windows. Never disassemble Microsoft code, examine its debug symbols, trace native Microsoft components with `+relay`, or write tests that dump internal tables. Never read Microsoft source code (leaked or "public") or ReactOS source code. Allowed sources: Microsoft documentation, Wine sources and tests, behaviour you observe.
 7. Keep logs out of the context. Read the digest. Open a full log only to answer one specific question, and read only the needed lines (use `grep`).
 8. If a step fails with an unexpected error, report the exact message to the user. Do not work around it silently.
+9. Code you write is not offered to Wine. Wine's guidelines forbid LLM-generated code. Your patches, reproducers and tests stay on the user's machine and in the [dllmgr catalog](https://github.com/unxed/dllmgr/tree/main/catalog). Wine gets text: the behaviour, the change in words, and how it was checked (step 10).
 
 ## Workflow
 
@@ -219,7 +220,9 @@ Self-check: give a cheaper subagent only the report text and the Wine source tre
 
 Show the final text to the user. Say whether it is a new bug or a comment in ticket N.
 
-Post only after the user's explicit yes. Posting goes through the user's own Bugzilla login in the agent's browser (the user logs in at https://bugs.winehq.org; you must not ask for the password). Attach patches as files.
+Gate before posting. A test that reproduces the behaviour described in the ticket fails on the unmodified Wine build and passes with only the proposed change, and the change was also checked by eye in the real application (the user confirms). A synthetic probe alone, or a build with several changes, does not pass the gate. Record the program version, Wine build, architecture, display setup, the exact command and the results.
+
+Post only after the user's explicit yes. Posting goes through the user's own Bugzilla login in the agent's browser (the user logs in at https://bugs.winehq.org; you must not ask for the password). Do not attach, paste or link code you wrote (rule 9): describe it in words only. A patch written by a person, such as one already in the ticket, may be referenced as usual. State in the text that it was prepared with an AI agent.
 
 ### 11. Finish
 

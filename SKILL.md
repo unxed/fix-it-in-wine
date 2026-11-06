@@ -153,6 +153,7 @@ Only changed files are rebuilt. If `git apply` fails, the patch does not fit thi
 - Never edit the hunk headers of a unified diff by hand. Apply the existing patch to a pristine tree, edit the source, and regenerate the patch with `git diff`.
 - Apply all patches selected for one module to the same pristine tree before building. A fix set builds each module once.
 - A CI run reported as "cancelled" may mean only that one matrix job hit its timeout. Read the per-job conclusions and the artifacts before you discard the run.
+- When the repository's heavy CI cancels in-progress runs on a new push (GitHub Actions `concurrency: cancel-in-progress`), a push that touches its path filter while an evaluation run is going cancels it. Commit locally and push code changes in one batch after the run; push documentation-only changes meanwhile.
 
 For comctl32 in Wine 11 there are two modules: `comctl32` and `comctl32_v6`. Build the one the program loads (step 3). Build both if unsure.
 

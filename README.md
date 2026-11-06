@@ -75,7 +75,7 @@ BSD-3-Clause. See [LICENSE](LICENSE).
 
 ## Showcases
 
-See [showcases/README.md](showcases/README.md): WineHQ bug 59609 (in progress), Far Manager 3 under Wine without modifying Far3 (planned), the Photoshop trial (planned, the final one).
+See [showcases/README.md](showcases/README.md): WineHQ bug 59609 (in progress), Far Manager 3 under Wine without modifying Far3 (planned), the final showcase on a program with no Linux alternative (to be chosen).
 
 ## Related work
 

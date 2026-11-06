@@ -4,7 +4,8 @@
 | --- | --- |
 | [WineHQ bug 59609](59609/README.md) — FastStone's thumbnail strip: the fix from the ticket, one DLL, one program, checked against Windows in CI | in progress |
 | Far Manager 3 — stable work under Wine without modifying Far3 itself | planned |
-| Adobe Photoshop trial — the final showcase | planned |
+| Adobe Photoshop trial | possible, not planned |
+| The final showcase: a program with no alternative on Linux, now or expected | to be chosen |
 
 ## Far Manager 3 (planned)
 
@@ -15,12 +16,17 @@ DLLs that cannot be replaced.
 Open: which problems Far3 hits under current Wine. The console side of Wine may involve DLLs that
 cannot be replaced, in which case dllmgr patches (concept section 16) are needed.
 
-## Photoshop trial (planned, the final one)
+## Photoshop trial (possible, not planned)
 
-Goal: the Photoshop trial works under Wine. Several agents work in parallel during the trial
-period, which limits the time: they test the program's areas and fix the bugs they find.
+This could be tried, but it is not planned work: a native Linux port of Affinity is being made
+([opennet, news 66605](https://www.opennet.ru/opennews/art.shtml?num=66605)), so an alternative
+will soon exist anyway.
 
-Prepare before the trial starts, so the trial time goes to testing and fixing: the list of areas
-and scenarios, the split between agents, the reproducers.
+If it is tried: several agents work in parallel during the trial period, which limits the time;
+prepare the list of areas and scenarios, the split between agents and the reproducers before the
+trial starts. Open: installation (the installer and Creative Cloud) under Wine.
 
-Open: installation (the installer and Creative Cloud) under Wine.
+## The final showcase (to be chosen)
+
+A showcase is more useful for a program that has no alternative on Linux and none in sight. The
+program is to be chosen.

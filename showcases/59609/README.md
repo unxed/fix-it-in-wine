@@ -44,25 +44,17 @@ Use a separate prefix: `run.sh` changes and then restores one comctl32 in it.
 
 ## For FastStone itself
 
-One command, for FastStone only (32-bit or 64-bit, Wine 9 or 11):
+The fix is now catalog entry
+[`winehq-59609`](https://github.com/unxed/dllmgr/blob/main/catalog/fixes/winehq-59609.md) in
+dllmgr. Its release and the one-step apply live there (decision D4: binaries are built by CI from
+the catalog's source):
 
 ```
-git clone https://github.com/unxed/fix-it-in-wine
-fix-it-in-wine/showcases/59609/apply.sh
+git clone https://github.com/unxed/dllmgr
+dllmgr/scripts/apply-winehq-59609.sh
 ```
 
-It finds `FSViewer.exe` in `WINEPREFIX` (default `~/.wine`; pass `--exe PATH` for a portable
-copy), checks its manifest to choose comctl32 v5 (system directory) or v6 (winsxs), downloads
-the fixed DLL for your exact `wine --version` from the
-[fix-59609 release](https://github.com/unxed/fix-it-in-wine/releases/tag/fix-59609) (checked
-against SHA256SUMS), and enables it for `FSViewer.exe` only. If the release has no file for your
-Wine version, it builds one here (`--build` forces that). Undo: `apply.sh --undo`.
-
-Then open a folder with many images, press F, move the mouse to the top of the screen and scroll
-the strip: the thumbnails must stay drawn.
-
-The release is built by [`release-59609.yml`](../../.github/workflows/release-59609.yml) from the
-Wine tags listed in its `SOURCE.txt` plus `fix.patch`.
+This showcase stays as the history of how the fix was found, built and checked.
 
 ## Results
 

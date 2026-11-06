@@ -45,9 +45,7 @@ jobs:
     needs: build
     runs-on: ubuntu-24.04
     env:
-      WINEPREFIX: ${{ runner.temp }}/pfx
       WINEDEBUG: -all
-      FIW_WORK: ${{ runner.temp }}/fiw
       FIW_WINE_GIT: https://github.com/wine-mirror/wine.git
       DISPLAY: ':99'
     steps:
@@ -64,6 +62,7 @@ jobs:
       - name: Showcase on Wine (before, build with fix.patch, after, undo)
         run: |
           set +e
+          export WINEPREFIX="$RUNNER_TEMP/pfx" FIW_WORK="$RUNNER_TEMP/fiw"
           Xvfb :99 -screen 0 1024x768x24 &
           sleep 2
           wineboot -i; wineserver -w

@@ -7,6 +7,9 @@
  * scrolls. WineHQ bug 59609: Wine returns client coordinates instead, so the
  * position moves by the scroll amount.
  *
+ * The verdict uses the x axis (the view scrolls horizontally); a change of y is printed
+ * as a note, because it means the items were re-arranged, not a coordinate-system error.
+ *
  * Exit code: 0 - view coordinates in both views (as documented);
  *            1 - client coordinates in at least one view (bug 59609);
  *            2 - setup failed, the view did not scroll, or neither result.
@@ -49,7 +52,7 @@ static int check(HWND parent, DWORD view, const char *name)
     HWND lv;
     LVITEMA it;
     POINT p0, p1, o0 = {0, 0}, o1 = {0, 0};
-    int i, s0, s1, moved_x, moved_y, scrolled_x, scrolled_y, verdict;
+    int i, s0, s1, moved_x, moved_y, scrolled_x, verdict;
     char text[16];
 
     lv = CreateWindowExA(0, WC_LISTVIEWA, "",
@@ -72,6 +75,10 @@ static int check(HWND parent, DWORD view, const char *name)
         }
     }
 
+    /* let the layout settle (scroll bars, arrangement) before the first measurement */
+    SendMessageA(lv, LVM_ARRANGE, LVA_DEFAULT, 0);
+    UpdateWindow(lv);
+
     if (!SendMessageA(lv, LVM_GETITEMPOSITION, PROBE, (LPARAM)&p0))
     {
         printf("%s: LVM_GETITEMPOSITION failed\n", name);
@@ -90,16 +97,18 @@ static int check(HWND parent, DWORD view, const char *name)
     moved_x = p0.x - p1.x;
     moved_y = p0.y - p1.y;
     scrolled_x = abs(o1.x - o0.x);
-    scrolled_y = abs(o1.y - o0.y);
 
     printf("%s: origin (%ld,%ld) -> (%ld,%ld), scroll pos %d -> %d, item %d position (%ld,%ld) -> (%ld,%ld): ",
            name, o0.x, o0.y, o1.x, o1.y, s0, s1, PROBE, p0.x, p0.y, p1.x, p1.y);
 
-    if (!scrolled_x && !scrolled_y && s0 == s1) { puts("did not scroll"); verdict = 2; }
-    else if (!moved_x && !moved_y) { puts("view coordinates"); verdict = 0; }
-    else if ((moved_x == scrolled_x && moved_y == scrolled_y) || (moved_x == s1 - s0 && !moved_y))
-    { puts("client coordinates"); verdict = 1; }
-    else { puts("neither"); verdict = 2; }
+    /* The view scrolls horizontally, so bug 59609 shows on the x axis. A change of y is a
+     * re-layout of the items, not the coordinate system: reported separately. */
+    if (!scrolled_x && s0 == s1) { fputs("did not scroll", stdout); verdict = 2; }
+    else if (!moved_x) { fputs("view coordinates", stdout); verdict = 0; }
+    else if (moved_x == scrolled_x || moved_x == s1 - s0) { fputs("client coordinates", stdout); verdict = 1; }
+    else { fputs("neither", stdout); verdict = 2; }
+    if (moved_y) printf(" (note: y changed by %d: the items were re-arranged)", -moved_y);
+    putchar('\n');
 
     DestroyWindow(lv);
     return verdict;

@@ -66,4 +66,18 @@ Wine tags listed in its `SOURCE.txt` plus `fix.patch`.
 
 ## Results
 
-See the latest run of the `showcase-59609` workflow and its summary.
+First run (workflow run 42155031164, 2026-11-06):
+
+- **Windows** (`windows-latest`, comctl32 5.82 and 6.16): in icon and small-icon view the item
+  position does not change after a 300-pixel scroll — view coordinates, as documented.
+- **Wine 9.0 (Ubuntu), builtin comctl32:** icon view `(2155,4) -> (1855,4)` — client
+  coordinates: bug 59609.
+- **The same Wine with comctl32 built from wine-9.0 with `fix.patch`**, enabled for the
+  reproducer only: icon view `(2155,4) -> (2155,4)` — view coordinates, both through the system
+  directory (v5) and through the winsxs copy (v6). Undo brings the bug back.
+- **Also seen, not part of 59609:** in small-icon view Wine re-arranges the items when the view
+  scrolls (`y` 42 -> 84, with and without the fix); `LVM_GETORIGIN` after scrolling right by 300
+  returns `(300,0)` on Windows and `(-300,0)` on Wine.
+
+That run reported exit code 2 on Wine, because the reproducer then compared both axes; it now
+judges the scroll axis and prints a change of `y` as a note. WineHQ stable and devel: pending.

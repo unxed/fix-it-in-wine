@@ -75,7 +75,7 @@ BSD-3-Clause. See [LICENSE](LICENSE).
 
 ## Showcases
 
-- [WineHQ bug 59609](showcases/59609/README.md): FastStone's thumbnail strip — the fix from the ticket, built as one DLL, enabled for one program, checked against real Windows in CI.
+See [showcases/README.md](showcases/README.md): WineHQ bug 59609 (in progress), Far Manager 3 under Wine without modifying Far3 (planned), the Photoshop trial (planned, the final one).
 
 ## Related work
 

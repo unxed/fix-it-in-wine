@@ -42,12 +42,12 @@ The user only has to log in to WineHQ Bugzilla, confirm the result by eye, and a
 3. **Minimal reproducer.** A tiny C program (mingw) reproduces the bug without the application: create a control, send a message, print the result. It runs under Xvfb, and the exit code is the verdict. It is at once the proof of the bug, the test of the fix, and the prose description of a future Wine test.
 4. **Fix.** The methods, in order of preference:
    1. A ready fix from the ticket: `git apply` to the sources of the user's version, build one DLL, enable it for the program, verify.
-   2. A small C fix in the Wine sources of the version the user has (or master, if the import check passes), by the same route. Such a fix is the easiest to get accepted upstream.
+   2. A small C fix in the Wine sources of the version the user has (or master, if the import check passes), by the same route. A small change is also the easiest for a Wine developer to reimplement from the report.
    3. The bug is deeper (unix part, user32/win32u): a **patch** over a DLL that cannot be replaced. See [patches over DLLs that cannot be replaced](https://github.com/unxed/dllmgr/blob/main/docs/concept.md). The patch intercepts the broken function and supplies the correct behaviour. It is installed through dllmgr under the same rule.
    4. Rewrite the module from scratch in Bp (as cc580 was). It builds faster, and there is less to think about memory. Use it only when the Wine module does not fit the program by design, or another reference behaviour is needed. Wine will not accept Bp code, so the report stays textual.
 
    Not fixed (wineserver, graphics and drivers, timings, DRM and anti-cheat): report only.
-5. **Upstream report.** A text for bugs.winehq.org: a new bug or a comment in the found ticket. The agent prepares the text and sends it only after the user says yes. Login: the user logs in to Bugzilla in the agent's browser, or creates an API key once in the profile settings (then the agent writes through REST without driving a browser). The template (`templates/bug-report.md`):
+5. **Upstream report.** A text for bugs.winehq.org: a new bug or a comment in the found ticket. Wine does not accept LLM-generated code, so the report carries no code the agent wrote: the behaviour, the fix in words and how it was checked. The patch stays in the [dllmgr catalog](https://github.com/unxed/dllmgr/tree/main/catalog); the prose of its fix entry has the same three parts as the report (dllmgr decisions D16, D17). Before posting, the gate in step 10 of `SKILL.md` must pass. The agent prepares the text and sends it only after the user says yes. Login: the user logs in to Bugzilla in the agent's browser, or creates an API key once in the profile settings (then the agent writes through REST without driving a browser). The template (`templates/bug-report.md`):
    - program and its version, Wine versions, regression commit;
    - symptom;
    - minimal reproducer;
@@ -57,7 +57,7 @@ The user only has to log in to WineHQ Bugzilla, confirm the result by eye, and a
    - how it was checked.
 
    Completion criterion: **the report is checked by doing**. A cheaper model, as a subagent, gets only the report text and the Wine tree, writes a patch from it, the patch builds, and the reproducer passes. If it does not pass, the report is not precise enough.
-6. **No Microsoft code.** Never disassemble Microsoft DLLs and never use leaked sources. The sources are Microsoft documentation, Wine tests and observed behaviour. This is a requirement Wine places on contributors.
+6. **No Microsoft code.** Windows is studied only as a black box: test programs run on Windows. Never disassemble Microsoft DLLs, examine their debug symbols, `+relay` native Microsoft components or use Microsoft or ReactOS sources, leaked or not. The sources are Microsoft documentation, Wine tests and observed behaviour. These are requirements of Wine's [Clean Room Guidelines](https://gitlab.winehq.org/wine/wine/-/wikis/Clean-Room-Guidelines), which also forbid LLM-generated code.
 7. **Self-improvement.** When experience shows the agent how to make the skill better, it opens a pull request to [unxed/fix-it-in-wine](https://github.com/unxed/fix-it-in-wine) right away: a change to the skill, the presets or the tools. Examples: a step had to be invented; a preset was missing; an instruction was wrong; a new kind of problem appeared. The PR says what happened, what to change, and on which case it showed up. Only generalised experience: no data, paths or logs from the user's machine. If a PR cannot be opened (no GitHub access), the agent saves the proposal to a file and tells the user.
 
 ## 4. Where it runs

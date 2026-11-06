@@ -2,7 +2,9 @@
 
 Fill every section. Write facts, not guesses. If a fact is unknown, write "unknown" and say why. Remove these instructions before posting.
 
-The text is posted only after the user has approved it.
+The text is posted only after the user has approved it, and only after the gate in step 10 of `SKILL.md` has passed.
+
+Wine does not accept LLM-generated code ([Clean Room Guidelines](https://gitlab.winehq.org/wine/wine/-/wikis/Clean-Room-Guidelines)). Do not paste or attach code the agent wrote: describe it in words. Code written by a person (for example a patch already in the ticket) may be referenced as usual.
 
 ## Title
 
@@ -43,15 +45,7 @@ Numbered steps in the program, starting from a clean prefix if the bug needs it.
 
 ## Minimal reproducer
 
-A short C program (mingw) that shows the bug without the application, or the reason why none could be made. Give the full source, the build command and the expected and actual output.
-
-```c
-```
-
-Build:
-
-```
-```
+A short C program (mingw) that shows the bug without the application, or the reason why none could be made. If the agent wrote it, do not paste the source: describe it in the "Test" section below and give a link to it (for example the dllmgr catalog entry), saying that it was written with AI help. Give the expected and actual output.
 
 Result on the bad version:
 
@@ -79,7 +73,7 @@ Edge cases:
 
 - 
 
-If a patch exists, attach it as a file to the bug, not as text in the comment.
+If a person wrote a patch, attach it as a file to the bug, not as text in the comment. If the agent wrote it, do not attach it: the steps above are the fix. You may link the dllmgr catalog entry that holds it, saying that it was written with AI help and is not offered for inclusion in Wine.
 
 ## Test for dlls/<dll>/tests
 
@@ -95,4 +89,8 @@ In words, so that a developer can write the test without this report's author:
 - The DLL that was built and how it was enabled:
 - Minimal reproducer before and after:
 - The application before and after (confirmed by the user by eye):
-- Report self-check: a subagent got only this text and the Wine tree, wrote a patch, the patch built, and the reproducer passed. State yes or no. If no, say what was missing.
+- Report self-check: a subagent got only this text and the Wine tree, wrote a patch, the patch built, and the reproducer passed. State yes or no. If no, say what was missing. This patch is for the check only and is not posted.
+
+## Disclosure
+
+This report was prepared with an AI agent (fix-it-in-wine). The code the agent wrote is not offered for inclusion in Wine.

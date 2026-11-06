@@ -45,7 +45,7 @@ Numbered steps in the program, starting from a clean prefix if the bug needs it.
 
 ## Minimal reproducer
 
-A short C program (mingw) that shows the bug without the application, or the reason why none could be made. If the agent wrote it, do not paste the source: describe it in the "Test" section below and give a link to it (for example the dllmgr catalog entry), saying that it was written with AI help. Give the expected and actual output.
+A short C program (mingw) that shows the bug without the application, or the reason why none could be made. If the agent wrote it, do not paste or link the source: describe it in words in the "Test" section below. Give the expected and actual output.
 
 Result on the bad version:
 
@@ -73,7 +73,7 @@ Edge cases:
 
 - 
 
-If a person wrote a patch, attach it as a file to the bug, not as text in the comment. If the agent wrote it, do not attach it: the steps above are the fix. You may link the dllmgr catalog entry that holds it, saying that it was written with AI help and is not offered for inclusion in Wine.
+If a person wrote a patch, attach it as a file to the bug, not as text in the comment. If the agent wrote it, do not attach or link it: the steps above are the fix.
 
 ## Test for dlls/<dll>/tests
 

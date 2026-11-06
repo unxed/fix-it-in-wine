@@ -222,7 +222,7 @@ Show the final text to the user. Say whether it is a new bug or a comment in tic
 
 Gate before posting. A test that reproduces the behaviour described in the ticket fails on the unmodified Wine build and passes with only the proposed change, and the change was also checked by eye in the real application (the user confirms). A synthetic probe alone, or a build with several changes, does not pass the gate. Record the program version, Wine build, architecture, display setup, the exact command and the results.
 
-Post only after the user's explicit yes. Posting goes through the user's own Bugzilla login in the agent's browser (the user logs in at https://bugs.winehq.org; you must not ask for the password). Do not attach or paste code you wrote (rule 9): describe it in words. You may link the dllmgr catalog entry that holds the patch, and say that it was written with AI help and is not offered for inclusion in Wine. A patch written by a person, such as one already in the ticket, may be referenced as usual. State in the text that it was prepared with an AI agent.
+Post only after the user's explicit yes. Posting goes through the user's own Bugzilla login in the agent's browser (the user logs in at https://bugs.winehq.org; you must not ask for the password). Do not attach, paste or link code you wrote (rule 9): describe it in words only. A patch written by a person, such as one already in the ticket, may be referenced as usual. State in the text that it was prepared with an AI agent.
 
 ### 11. Finish
 

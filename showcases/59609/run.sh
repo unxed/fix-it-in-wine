@@ -35,13 +35,18 @@ if git -C "$src" apply --check "$here/fix.patch" 2>/dev/null; then
 elif ! git -C "$src" apply --reverse --check "$here/fix.patch" 2>/dev/null; then
     echo "fix.patch does not apply to $tag"; exit 2
 fi
-built=$(bash "$tools/build_one_dll.sh" "$tag" comctl32) || exit 2
+# Wine 11 splits comctl32 into comctl32 (v5) and comctl32_v6; the side-by-side copy in winsxs
+# is comctl32_v6 under the name comctl32.dll. Wine 9 has one module for both.
+mods=comctl32; [ -d "$src/dlls/comctl32_v6" ] && mods="comctl32 comctl32_v6"
+built=$(bash "$tools/build_one_dll.sh" "$tag" $mods) || exit 2
 echo "$built"
-dll=$(echo "$built" | grep x86_64-windows)
+dll=$(echo "$built" | grep '/comctl32/x86_64-windows/')
+dll6=$(echo "$built" | grep '/comctl32_v6/x86_64-windows/' || true)
+[ -n "$dll6" ] || dll6=$dll
 
 step "enable it for lvpos.exe (system slot) and lvpos6.exe (side-by-side slot) only"
 python3 "$tools/override.py" apply --prefix "$WINEPREFIX" --exe lvpos.exe --dll "$dll" || exit 2
-python3 "$tools/override.py" apply --prefix "$WINEPREFIX" --exe lvpos6.exe --dll "$dll" \
+python3 "$tools/override.py" apply --prefix "$WINEPREFIX" --exe lvpos6.exe --dll "$dll6" \
     --name comctl32.dll --slot "$sxs_slot"; sxs=$?
 
 step "after"

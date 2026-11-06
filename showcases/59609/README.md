@@ -44,20 +44,40 @@ Use a separate prefix: `run.sh` changes and then restores one comctl32 in it.
 
 ## For FastStone itself
 
-FastStone is 32-bit. Build comctl32 for both architectures (`tools/build_one_dll.sh` does this)
-and enable the `i386-windows` build for `FSViewer.exe` in your prefix:
+One command, for FastStone only (32-bit or 64-bit, Wine 9 or 11):
 
 ```
-git -C ~/.cache/fix-it-in-wine/src/wine-9.0 apply showcases/59609/fix.patch
-tools/build_one_dll.sh wine-9.0 comctl32
-tools/override.py apply --prefix ~/.wine --exe FSViewer.exe --dll ~/.cache/fix-it-in-wine/build/wine-9.0/dlls/comctl32/i386-windows/comctl32.dll
+git clone https://github.com/unxed/fix-it-in-wine
+fix-it-in-wine/showcases/59609/apply.sh
 ```
 
-Use the tag of your Wine version (`wine --version`). If `tools/wineprobe.py run --dll comctl32`
-shows that FastStone loads comctl32 from `winsxs` (version 6), use the side-by-side slot instead,
-as in `run.sh`. Then open a folder with many images, press F, move the mouse to the top of the
-screen and scroll the strip: the thumbnails must stay drawn.
+It finds `FSViewer.exe` in `WINEPREFIX` (default `~/.wine`; pass `--exe PATH` for a portable
+copy), checks its manifest to choose comctl32 v5 (system directory) or v6 (winsxs), downloads
+the fixed DLL for your exact `wine --version` from the
+[fix-59609 release](https://github.com/unxed/fix-it-in-wine/releases/tag/fix-59609) (checked
+against SHA256SUMS), and enables it for `FSViewer.exe` only. If the release has no file for your
+Wine version, it builds one here (`--build` forces that). Undo: `apply.sh --undo`.
+
+Then open a folder with many images, press F, move the mouse to the top of the screen and scroll
+the strip: the thumbnails must stay drawn.
+
+The release is built by [`release-59609.yml`](../../.github/workflows/release-59609.yml) from the
+Wine tags listed in its `SOURCE.txt` plus `fix.patch`.
 
 ## Results
 
-See the latest run of the `showcase-59609` workflow and its summary.
+First run (workflow run 42155031164, 2026-11-06):
+
+- **Windows** (`windows-latest`, comctl32 5.82 and 6.16): in icon and small-icon view the item
+  position does not change after a 300-pixel scroll — view coordinates, as documented.
+- **Wine 9.0 (Ubuntu), builtin comctl32:** icon view `(2155,4) -> (1855,4)` — client
+  coordinates: bug 59609.
+- **The same Wine with comctl32 built from wine-9.0 with `fix.patch`**, enabled for the
+  reproducer only: icon view `(2155,4) -> (2155,4)` — view coordinates, both through the system
+  directory (v5) and through the winsxs copy (v6). Undo brings the bug back.
+- **Also seen, not part of 59609:** in small-icon view Wine re-arranges the items when the view
+  scrolls (`y` 42 -> 84, with and without the fix); `LVM_GETORIGIN` after scrolling right by 300
+  returns `(300,0)` on Windows and `(-300,0)` on Wine.
+
+That run reported exit code 2 on Wine, because the reproducer then compared both axes; it now
+judges the scroll axis and prints a change of `y` as a note. WineHQ stable and devel: pending.

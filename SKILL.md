@@ -150,6 +150,18 @@ Only changed files are rebuilt. If `git apply` fails, the patch does not fit thi
 
 For comctl32 in Wine 11 there are two modules: `comctl32` and `comctl32_v6`. Build the one the program loads (step 3). Build both if unsure.
 
+### 5a. Waiting for a CI run
+
+```
+tools/ci_wait.py --repo OWNER/REPO --run ID --job NAME --artifact JOB:NAME --out DIR --stall-min M
+```
+
+- Run the wait in the background and keep working. Do not block on a polling loop.
+- Wait for the specific job, not the whole run. The tool fetches its artifact as soon as the job is done; read it then.
+- An empty or missing job list is never "done". Test that the job exists and is completed.
+- Do not push to a branch whose run you are waiting for: `cancel-in-progress` cancels the run. Batch commits locally and push once the result is in.
+- Set `--stall-min` to about 2-3x the job's normal duration. A stall (or a cancelled or failed run) is a failure to investigate, not a reason to keep waiting.
+
 ### 6. Enable it for this program
 
 Use the 32-bit build (`i386-windows`) for a 32-bit program, the 64-bit one (`x86_64-windows`) for a 64-bit program.

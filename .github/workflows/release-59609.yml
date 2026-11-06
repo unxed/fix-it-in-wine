@@ -46,7 +46,7 @@ jobs:
           for tag in ${{ steps.tags.outputs.tags }}; do
             src="$FIW_WORK/src/$tag"
             git clone -q --depth 1 --branch "$tag" "$FIW_WINE_GIT" "$src"
-            git -C "$src" apply showcases/59609/fix.patch
+            git -C "$src" apply "$GITHUB_WORKSPACE/showcases/59609/fix.patch"
             mods=comctl32; [ -d "$src/dlls/comctl32_v6" ] && mods="comctl32 comctl32_v6"
             bash tools/build_one_dll.sh "$tag" $mods > built.txt
             while read -r f; do

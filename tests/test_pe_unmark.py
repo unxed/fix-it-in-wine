@@ -156,3 +156,29 @@ class CliTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestExportName(unittest.TestCase):
+    def build(self, name):
+        import struct
+        d = bytearray(0x400)
+        d[0:2] = b"MZ"; struct.pack_into("<I", d, 0x3C, 0x60)
+        d[0x60:0x64] = b"PE\0\0"
+        struct.pack_into("<HH", d, 0x64, 0x14C, 1)          # machine, one section
+        struct.pack_into("<H", d, 0x74, 0xE0)              # size of optional header
+        opt = 0x78
+        struct.pack_into("<H", d, opt, 0x10B)              # PE32
+        struct.pack_into("<II", d, opt + 96, 0x1000, 0x28) # export directory
+        sec = opt + 0xE0
+        struct.pack_into("<8sIIII", d, sec, b".edata", 0x100, 0x1000, 0x100, 0x200)
+        struct.pack_into("<I", d, 0x200 + 12, 0x1028)      # name RVA
+        d[0x228:0x228 + len(name) + 1] = name + b"\0"
+        return bytes(d)
+
+    def test_names(self):
+        self.assertEqual(pe_unmark.pe_export_name(self.build(b"comctl32_v6.dll")), "comctl32_v6.dll")
+        self.assertEqual(pe_unmark.pe_export_name(self.build(b"comctl32.dll")), "comctl32.dll")
+
+    def test_not_pe(self):
+        with self.assertRaises(pe_unmark.NotPE):
+            pe_unmark.pe_export_name(b"MZ" + bytes(0x100))

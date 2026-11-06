@@ -30,3 +30,14 @@ trial starts. Open: installation (the installer and Creative Cloud) under Wine.
 
 A showcase is more useful for a program that has no alternative on Linux and none in sight. The
 program is to be chosen.
+
+Candidates (their state under Wine is not checked yet):
+
+- **Programs of the Russian Federal Tax Service (FNS): "Deklaratsiya" (personal income tax
+  returns) and "Nalogoplatelshchik YuL" (reports of organisations).** Windows only, no Linux
+  version and none expected; a new version comes out every year; many users; no hardware
+  needed, so the whole check can run in CI.
+- **Car diagnostics and device firmware tools (for example VCDS).** Usually no alternative;
+  they need a USB adapter, so they cannot run in CI.
+- **Narrow engineering and scientific software tied to particular equipment or a particular
+  industry.** Which programs matter depends on the audience.

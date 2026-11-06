@@ -1,0 +1,3 @@
+/* Embed lvpos6.manifest as the process manifest (resource type 24 = RT_MANIFEST, id 1),
+   so lvpos6.exe gets comctl32 version 6. */
+1 24 "lvpos6.manifest"

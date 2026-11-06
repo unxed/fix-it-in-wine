@@ -1,0 +1,73 @@
+name: showcase-59609
+
+on:
+  push:
+    paths: ['showcases/59609/**', 'tools/**', '.github/workflows/showcase-59609.yml']
+  pull_request:
+    paths: ['showcases/59609/**', 'tools/**', '.github/workflows/showcase-59609.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mingw-w64
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-mingw-w64-x86-64
+      - name: Build the reproducer (comctl32 v5 and v6)
+        working-directory: showcases/59609
+        run: |
+          x86_64-w64-mingw32-gcc -O2 -Wall -o lvpos.exe lvpos.c -lcomctl32
+          x86_64-w64-mingw32-windres lvpos6.rc -O coff -o lvpos6.res
+          x86_64-w64-mingw32-gcc -O2 -Wall -o lvpos6.exe lvpos.c lvpos6.res -lcomctl32
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lvpos
+          path: showcases/59609/*.exe
+
+  windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: lvpos
+      - name: Run on Windows (documented behaviour - expected exit 0)
+        shell: bash
+        run: |
+          set +e
+          ./lvpos.exe; a=$?
+          ./lvpos6.exe; b=$?
+          echo "Windows: lvpos.exe exit $a, lvpos6.exe exit $b" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$a" = 0 ] && [ "$b" = 0 ]
+
+  wine:
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      WINEDEBUG: -all
+      FIW_WINE_GIT: https://github.com/wine-mirror/wine.git
+      DISPLAY: ':99'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: lvpos
+          path: bin
+      - name: Install Wine from Ubuntu and the build packages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq wine wine64 xvfb git gcc make flex bison gcc-mingw-w64-i686 gcc-mingw-w64-x86-64
+          wine --version
+      - name: Showcase on Wine (before, build with fix.patch, after, undo)
+        run: |
+          set +e
+          export WINEPREFIX="$RUNNER_TEMP/pfx" FIW_WORK="$RUNNER_TEMP/fiw"
+          Xvfb :99 -screen 0 1024x768x24 &
+          sleep 2
+          wineboot -i; wineserver -w
+          grep -m1 '^#arch=' "$WINEPREFIX/system.reg"
+          bash showcases/59609/run.sh bin 2>&1 | tee result.txt
+          rc=${PIPESTATUS[0]}
+          { echo '```'; tail -n 4 result.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc

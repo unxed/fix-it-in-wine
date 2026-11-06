@@ -1,0 +1,25 @@
+Fix for WineHQ bug 59609 from its description (reporter T_Im, 2026-04-02, comment 0:
+"Feel free to use or rewrite the code"). Same logic, turned into a unified diff
+against wine-11.0; it also applies to wine-9.0 (the function body is identical).
+
+diff --git a/dlls/comctl32/listview.c b/dlls/comctl32/listview.c
+index f91e63f..7567a88 100644
+--- a/dlls/comctl32/listview.c
++++ b/dlls/comctl32/listview.c
+@@ -6999,8 +6999,14 @@ static BOOL LISTVIEW_GetItemPosition(const LISTVIEW_INFO *infoPtr, INT nItem, LP
+         lpptPosition->x += (infoPtr->nItemWidth - infoPtr->iconSize.cx) / 2;
+         lpptPosition->y += ICON_TOP_PADDING;
+     }
+-    lpptPosition->x += Origin.x;
+-    lpptPosition->y += Origin.y;
++
++    /* In Icon/SmallIcon views, position is in view coordinates (absolute).
++     * In Details/List views, position is in client coordinates. */
++    if (infoPtr->uView == LV_VIEW_DETAILS || infoPtr->uView == LV_VIEW_LIST)
++    {
++        lpptPosition->x += Origin.x;
++        lpptPosition->y += Origin.y;
++    }
+     
+     TRACE ("  lpptPosition=%s\n", wine_dbgstr_point(lpptPosition));
+     return TRUE;

@@ -43,15 +43,7 @@ Numbered steps in the program, starting from a clean prefix if the bug needs it.
 
 ## Minimal reproducer
 
-A short C program (mingw) that shows the bug without the application, or the reason why none could be made. Give the full source, the build command and the expected and actual output.
-
-```c
-```
-
-Build:
-
-```
-```
+Describe in words a short program that shows the bug without the application: what it creates, what it calls or sends, in which order, and what it prints. Do not paste its code if an AI agent wrote it: Wine does not accept LLM-generated code. If no reproducer could be made, say why.
 
 Result on the bad version:
 
@@ -79,7 +71,7 @@ Edge cases:
 
 - 
 
-If a patch exists, attach it as a file to the bug, not as text in the comment.
+Do not attach a patch written by an AI agent. A human-written patch may be attached as a file.
 
 ## Test for dlls/<dll>/tests
 
@@ -95,4 +87,4 @@ In words, so that a developer can write the test without this report's author:
 - The DLL that was built and how it was enabled:
 - Minimal reproducer before and after:
 - The application before and after (confirmed by the user by eye):
-- Report self-check: a subagent got only this text and the Wine tree, wrote a patch, the patch built, and the reproducer passed. State yes or no. If no, say what was missing.
+- Analysis was done with an AI agent; no AI-written code is included.

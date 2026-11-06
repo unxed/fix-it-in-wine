@@ -44,6 +44,7 @@ jobs:
   wine:
     needs: build
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -79,7 +80,8 @@ jobs:
           export WINEPREFIX="$RUNNER_TEMP/pfx" FIW_WORK="$RUNNER_TEMP/fiw"
           Xvfb :99 -screen 0 1024x768x24 &
           sleep 2
-          wineboot -i; wineserver -w
+          # WineHQ builds ask to install wine-mono and gecko in a window nobody can close here
+          WINEDLLOVERRIDES='mscoree,mshtml=' wineboot -i; wineserver -w
           grep -m1 '^#arch=' "$WINEPREFIX/system.reg"
           bash showcases/59609/run.sh bin 2>&1 | tee result.txt
           rc=${PIPESTATUS[0]}

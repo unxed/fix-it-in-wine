@@ -68,18 +68,28 @@ class OverrideTest(unittest.TestCase):
             f.write(data)
         return path
 
-    def install_wine(self, query_output):
-        """Fake wine: logs its arguments; `reg query` prints query_output, exit 1 if empty."""
+    def install_wine(self, query_output, global_output=""):
+        r"""Fake wine: logs its arguments; `reg query` always exits 0.
+
+        `query_output` is printed for per-exe AppDefaults keys.
+        `global_output` is printed for the global HKCU\Software\Wine\DllOverrides key.
+        """
         script = os.path.join(self.tmp.name, "fake-wine")
-        qrc = 0 if query_output else 1
         with open(script, "w") as f:
             f.write("#!/bin/sh\n"
                     "printf '%%s\\n' \"$*\" >> '%s'\n"
                     "if [ \"$1 $2\" = \"reg query\" ]; then\n"
-                    "  printf '%%s' '%s'\n"
-                    "  exit %d\n"
+                    "  case \"$3\" in\n"
+                    "    *AppDefaults*)\n"
+                    "      printf '%%s' '%s'\n"
+                    "      ;;\n"
+                    "    *\\\\DllOverrides)\n"
+                    "      printf '%%s' '%s'\n"
+                    "      ;;\n"
+                    "  esac\n"
+                    "  exit 0\n"
                     "fi\n"
-                    "exit 0\n" % (self.log, query_output, qrc))
+                    "exit 0\n" % (self.log, query_output, global_output))
         os.chmod(script, 0o755)
         patcher = mock.patch.dict(os.environ, {"FIW_WINE": script})
         patcher.start()
@@ -133,11 +143,32 @@ class OverrideTest(unittest.TestCase):
         self.assertIn("no entries", out)
 
     def test_undo_restores_previous_registry_value(self):
-        self.install_wine("    comctl32    REG_SZ    builtin\n")
+        # No global override -> no conflict, apply succeeds.
+        self.install_wine("    comctl32    REG_SZ    builtin\n", global_output="")
         self.apply()
         rc, _, err = self.undo("app.exe", "comctl32.dll")
         self.assertEqual(rc, 0, err)
         self.assertIn("reg add %s /v comctl32 /d builtin /f" % (KEY % "app.exe"), self.wine_calls())
+
+    def test_apply_refused_when_global_override_exists(self):
+        # A global override of comctl32 would load our shared file in
+        # every program; refuse to install into a shared slot.
+        self.install_wine("", global_output="    comctl32    REG_SZ    native\n")
+        rc, _, err = self.apply()
+        self.assertNotEqual(rc, 0, err)
+        self.assertIn("refusing to install shared", err)
+        self.assertIn("could load this file in a different program", err)
+        # File must not have been modified.
+        self.assertEqual(self.read(self.dest), self.orig)
+
+    def test_apply_allowed_when_global_override_exists_for_appdir(self):
+        # appdir slot is per-exe; a global override does not block it.
+        self.install_wine("", global_output="    comctl32    REG_SZ    native\n")
+        exe = os.path.join(self.prefix, "drive_c", "Program Files", "App.exe")
+        os.makedirs(os.path.dirname(exe), exist_ok=True)
+        open(exe, "wb").close()
+        rc, _, err = self.apply("App.exe", self.dll, "--slot", "appdir")
+        self.assertEqual(rc, 0, err)
 
     def test_second_apply_refused(self):
         self.assertEqual(self.apply()[0], 0)
@@ -238,6 +269,66 @@ class OverrideTest(unittest.TestCase):
         self.assertEqual(override.slot_dir(p, "system", "i386", "win64"), w + "syswow64")
         self.assertEqual(override.slot_dir(p, "system", "i386", "win32"), w + "system32")
         self.assertEqual(override.slot_dir(p, "system", "x86_64", "win64"), w + "system32")
+
+    def test_appdir_slot_dir(self):
+        p = self.prefix
+        exe = os.path.join(p, "drive_c", "Program Files", "FSViewer", "FSViewer.exe")
+        os.makedirs(os.path.dirname(exe), exist_ok=True)
+        open(exe, "wb").close()
+        self.assertEqual(override.slot_dir(p, "appdir", "i386", "win64", exe),
+                         os.path.join(p, "drive_c", "Program Files", "FSViewer"))
+
+    def test_appdir_slot_dir_no_exe(self):
+        rc, _, err = self.apply("app.exe", None, "--slot", "appdir")
+        self.assertNotEqual(rc, 0)
+        self.assertIn("expected one app.exe under drive_c, found", err)
+
+    def test_appdir_apply_creates_file_next_to_exe(self):
+        exe = os.path.join(self.prefix, "drive_c", "Program Files", "FSViewer.exe")
+        os.makedirs(os.path.dirname(exe), exist_ok=True)
+        open(exe, "wb").close()
+        dll = self.make_file("new/comctl32.dll", self.new)
+        rc, out, err = self.apply("FSViewer.exe", dll, "--slot", "appdir", "--name", "comctl32.dll")
+        self.assertEqual(rc, 0, err)
+        dest = os.path.join(os.path.dirname(exe), "comctl32.dll")
+        self.assertEqual(self.read(dest), unmarked(self.new))
+        self.assertIn("installed " + dest, out)
+        # No backup was made
+        entries = override.load_state(self.prefix)["entries"]
+        self.assertEqual(len(entries), 1)
+        self.assertIsNone(entries[0]["backup"])
+        self.assertIsNone(entries[0]["orig_sha256"])
+
+    def test_appdir_undo_removes_created_file(self):
+        exe = os.path.join(self.prefix, "drive_c", "Program Files", "FSViewer.exe")
+        os.makedirs(os.path.dirname(exe), exist_ok=True)
+        open(exe, "wb").close()
+        dll = self.make_file("new/comctl32.dll", self.new)
+        self.apply("FSViewer.exe", dll, "--slot", "appdir", "--name", "comctl32.dll")
+        dest = os.path.join(os.path.dirname(exe), "comctl32.dll")
+        rc, out, err = self.undo("FSViewer.exe", "comctl32.dll")
+        self.assertEqual(rc, 0, err)
+        self.assertFalse(os.path.exists(dest))
+        self.assertIn("removed " + dest, out)
+
+    def test_appdir_undo_keeps_file_shared_by_other_exe(self):
+        exe = os.path.join(self.prefix, "drive_c", "Program Files", "FSViewer.exe")
+        os.makedirs(os.path.dirname(exe), exist_ok=True)
+        open(exe, "wb").close()
+        dll = self.make_file("new/comctl32.dll", self.new)
+        self.apply("FSViewer.exe", dll, "--slot", "appdir", "--name", "comctl32.dll")
+        dest = os.path.join(os.path.dirname(exe), "comctl32.dll")
+        # Same dest shared by another exe; simulate by adding a second entry.
+        state = override.load_state(self.prefix)
+        state["entries"].append(dict(
+            exe="Other.exe", name="comctl32.dll", dest=dest, backup=None,
+            orig_sha256=None, new_sha256=override.sha256(unmarked(self.new)),
+            reg_before=None))
+        override.save_state(self.prefix, state)
+        rc, out, err = self.undo("FSViewer.exe", "comctl32.dll")
+        self.assertEqual(rc, 0, err)
+        self.assertTrue(os.path.exists(dest))
+        self.assertIn("still used by", out)
 
     def test_parse_reg_query(self):
         text = "HKEY_CURRENT_USER\\...\n    comctl32    REG_SZ    native,builtin\n"

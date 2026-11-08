@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Enable one DLL for one program in one Wine prefix, reversibly.
 
-  override.py apply --prefix P --exe NAME.exe --dll FILE [--name comctl32.dll] [--slot system|sxs:<glob>]
+  override.py apply --prefix P --exe NAME.exe --dll FILE [--name comctl32.dll] [--slot system|sxs:<glob>|appdir]
   override.py undo  --prefix P --exe NAME.exe --name comctl32[.dll] [--force]
   override.py status --prefix P
 
@@ -76,7 +76,7 @@ def prefix_arch(prefix):
     raise OverrideError("no '#arch=' line in %s" % path)
 
 
-def slot_dir(prefix, slot, dll_arch, pfx_arch):
+def slot_dir(prefix, slot, dll_arch, pfx_arch, exe_path=None):
     """Directory the DLL goes to."""
     win = os.path.join(prefix, "drive_c", "windows")
     if slot == "system":
@@ -96,7 +96,28 @@ def slot_dir(prefix, slot, dll_arch, pfx_arch):
             raise OverrideError("slot %s must match exactly one directory in %s, found:%s"
                                 % (slot, base, listing))
         return matches[0]
-    raise OverrideError("unknown slot %r (use system or sxs:<glob>)" % slot)
+    if slot == "appdir":
+        if not exe_path:
+            raise OverrideError("appdir slot requires --exe")
+        drive_c = os.path.join(prefix, "drive_c")
+        exe_full = exe_path if os.path.isabs(exe_path) else None
+        if exe_full is None:
+            # --exe may be a bare name (e.g. FSViewer.exe); search drive_c for it.
+            matches = []
+            for root, _dirs, files in os.walk(drive_c):
+                for fn in files:
+                    if fn.lower() == exe_path.lower():
+                        matches.append(os.path.join(root, fn))
+            if len(matches) != 1:
+                listing = "".join("\n  " + m for m in matches) or " none"
+                raise OverrideError("appdir slot: expected one %s under drive_c, found:%s"
+                                    % (exe_path, listing))
+            exe_full = matches[0]
+        exe_full = os.path.normpath(exe_full)
+        if not os.path.exists(exe_full):
+            raise OverrideError("exe not found: %s" % exe_full)
+        return os.path.dirname(exe_full)
+    raise OverrideError("unknown slot %r (use system, sxs:<glob>, or appdir)" % slot)
 
 
 # ---------- files and state ----------
@@ -188,6 +209,55 @@ def reg_delete(prefix, exe, value):
         raise OverrideError("wine reg delete failed: %s" % (r.stderr.strip() or r.returncode))
 
 
+def conflicting_overrides(prefix, exe, dll):
+    """Find registry overrides of `dll` that could load a shared DLL file
+    in a program other than `exe`.
+
+    Returns a list of (key_path, value) tuples, or [] when no conflicts.
+    Checked: global HKCU\\Software\\Wine\\DllOverrides\\<dll>,
+             wildcard *<dll>, and per-exe AppDefaults\\<other_exe>\\DllOverrides\\<dll>.
+    """
+    dll = norm(dll)
+    conflicts = []
+
+    # 1. Global override: HKCU\Software\Wine\DllOverrides\<dll>
+    r = run_wine(prefix, "reg", "query", "HKCU\\Software\\Wine\\DllOverrides", "/v", dll)
+    if r.returncode == 0:
+        v = parse_reg_query(r.stdout, dll)
+        if v is not None:
+            conflicts.append(("HKCU\\Software\\Wine\\DllOverrides", v))
+
+    # 2. Wildcard override: HKCU\Software\Wine\DllOverrides\*<dll>
+    r = run_wine(prefix, "reg", "query", "HKCU\\Software\\Wine\\DllOverrides", "/v", "*" + dll)
+    if r.returncode == 0:
+        v = parse_reg_query(r.stdout, "*" + dll)
+        if v is not None:
+            conflicts.append(("HKCU\\Software\\Wine\\DllOverrides (wildcard)", v))
+
+    # 3. Per-exe overrides for every other executable in AppDefaults.
+    r = run_wine(prefix, "reg", "query", "HKCU\\Software\\Wine\\AppDefaults")
+    if r.returncode == 0:
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if not line or not line.startswith("HKEY_CURRENT_USER\\"):
+                continue
+            m = re.match(
+                r"HKEY_CURRENT_USER\\Software\\Wine\\AppDefaults\\([^\\]+)\\DllOverrides$", line)
+            if not m:
+                continue
+            other_exe = m.group(1)
+            if other_exe.lower() == exe.lower():
+                continue
+            sub = run_wine(prefix, "reg", "query", line, "/v", dll)
+            if sub.returncode == 0:
+                v = parse_reg_query(sub.stdout, dll)
+                if v is not None:
+                    conflicts.append(("HKCU\\Software\\Wine\\AppDefaults\\%s\\DllOverrides"
+                                      % other_exe, v))
+
+    return conflicts
+
+
 # ---------- commands ----------
 
 def cmd_apply(args):
@@ -207,8 +277,9 @@ def cmd_apply(args):
         raise OverrideError("%s is not a usable PE file: %s" % (args.dll, e))
     except Placeholder:
         raise OverrideError("%s is a Wine placeholder file without code" % args.dll)
-    dest = os.path.join(slot_dir(prefix, args.slot, dll_arch, arch), name)
-    if not os.path.lexists(dest):
+    is_appdir = args.slot == "appdir"
+    dest = os.path.join(slot_dir(prefix, args.slot, dll_arch, arch, args.exe), name)
+    if not is_appdir and not os.path.lexists(dest):
         raise OverrideError("nothing to replace at %s" % dest)
     new_sha = sha256(new)
 
@@ -217,12 +288,27 @@ def cmd_apply(args):
         if e["new_sha256"] != new_sha:
             raise OverrideError("%s is already replaced by a different DLL for %s %s"
                                 % (dest, e["exe"], e["name"]))
+
+    # For shared slots (system / sxs:) the file is visible to every program
+    # in the prefix. Guard against any other registry override of the same
+    # DLL that could load our shared file in a different program.
+    if not is_appdir:
+        conflicts = conflicting_overrides(prefix, args.exe, name)
+        if conflicts:
+            detail = "; ".join("%s=%s" % (k, v) for k, v in conflicts)
+            raise OverrideError(
+                "refusing to install shared %s for %s: another override of %s "
+                "could load this file in a different program: %s"
+                % (name, args.exe, name, detail))
+
     print_lines = []
     wrote = None                      # original bytes + mode if we replaced the file
+    backup = None                     # backup path (None when no original existed)
+    orig_sha = None                   # sha of original (None when no original existed)
     if same:
         orig_sha, backup = same[0]["orig_sha256"], same[0]["backup"]
         print_lines.append("shared %s (already replaced for %s)" % (dest, same[0]["exe"]))
-    else:
+    elif os.path.lexists(dest):
         orig = read_file(dest)
         orig_sha = sha256(orig)
         backup = os.path.join(prefix, STATE_DIR, "backup", orig_sha)
@@ -234,13 +320,25 @@ def cmd_apply(args):
         wrote = (orig, mode)
         print_lines.append("backup: %s" % backup)
         print_lines.append("replaced %s" % dest)
+    else:
+        # App-dir slot: creating a new file next to the exe, nothing to back up.
+        mode = 0o644
+        write_atomic(dest, new, mode)
+        wrote = (None, mode)
+        print_lines.append("installed %s" % dest)
 
     try:
         before = reg_query(prefix, args.exe, value)
         reg_add(prefix, args.exe, value, OVERRIDE_VALUE)
     except OverrideError:
-        if wrote:
+        if wrote and wrote[0] is not None:
             write_atomic(dest, wrote[0], wrote[1])
+        elif wrote and not os.path.lexists(dest):
+            # We created a new file; roll back by removing it.
+            try:
+                os.unlink(dest)
+            except OSError:
+                pass
         raise
     state["entries"].append({
         "exe": args.exe, "name": name, "dest": dest, "backup": backup,
@@ -262,12 +360,11 @@ def cmd_undo(args):
     if not entry:
         raise OverrideError("no applied entry for %s %s" % (args.exe, args.name))
     dest = entry["dest"]
-    if file_sha(dest) != entry["new_sha256"] and not args.force:
+    dest_exists = os.path.lexists(dest)
+    if dest_exists and file_sha(dest) != entry["new_sha256"] and not args.force:
         raise OverrideError("file changed outside fix-it-in-wine: %s (use --force)" % dest)
     others = [e for e in state["entries"] if e is not entry and e["dest"] == dest]
-    orig = None
-    if not others:
-        orig = read_file(entry["backup"])
+    backup = entry["backup"]
 
     value = norm(entry["name"])
     if entry["reg_before"] is None:
@@ -276,9 +373,17 @@ def cmd_undo(args):
     else:
         reg_add(prefix, entry["exe"], value, entry["reg_before"])
         print("registry: %s of %s set back to %s" % (value, entry["exe"], entry["reg_before"]))
-    if orig is None:
+
+    if not dest_exists:
+        print("file already absent: %s" % dest)
+    elif others:
         print("kept %s (still used by %s)" % (dest, others[0]["exe"]))
+    elif backup is None:
+        # App-dir slot with no original: the file was created by us, remove it.
+        os.unlink(dest)
+        print("removed %s" % dest)
     else:
+        orig = read_file(backup)
         mode = os.stat(dest).st_mode & 0o7777 if os.path.exists(dest) else None
         write_atomic(dest, orig, mode)
         print("restored %s" % dest)

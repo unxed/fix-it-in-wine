@@ -217,6 +217,11 @@ Measuring from outside:
 - Measure scrolling by reading item 0's rectangle with `LVM_GETITEMRECT`, through memory allocated in the target process (`VirtualAllocEx`, `WriteProcessMemory`, `ReadProcessMemory`). For a 32-bit target keep the buffer below 4 GB.
 - Before you conclude "it did not move", check that the measurement fields are present in the log.
 - Compare screenshots by cropping the same region from the baseline, the candidate and the Windows captures at the same DPI. Describe concrete differences: which element crosses which frame.
+- Judge on-screen pixels from the X server (`import -window root`, `XGetImage`), not from Wine's screen DC: after an Expose that Wine did not present, `GetPixel(GetDC(NULL))` returned the window surface colour while X showed something else.
+- Flicker and first-paint problems need a window manager without compositing (for example Metacity `--compositor=none`). A compositor (mutter, Muffin, KWin) hides or reorders short phases, so a pass there proves nothing.
+- Many old programs are DPI-unaware: at 192 DPI Wine scales their coordinates by 2. Code that captures and draws for such a window must work in physical pixels on both sides, or it shows enlarged copies.
+- With WineHQ packages (old WoW64) a 32-bit program loads `lib/wine/i386-unix/*.so`; in new-WoW64 builds only `x86_64-unix` exists. Rebuild and test the layout the program actually uses.
+- Reproduce the user's launch path exactly (menu entry, file manager, `wine`, a launcher): an app-private runtime or override applies only to the paths that use it.
 
 ### 8. Order of fix methods
 
@@ -224,18 +229,24 @@ Use the first that works:
 
 1. A fix from the ticket: apply the ticket's patch to the source tree, build, enable, verify.
 2. A small fix in Wine's C code, on the tag of the user's version. Write the smallest change that fixes the behaviour. Base it on Microsoft documentation and Wine tests, not on Microsoft binaries.
-3. A patch over a DLL that cannot be replaced. This needs dllmgr ([concept](https://github.com/unxed/dllmgr/blob/main/docs/concept.md)). It does not exist yet: do not try.
+3. A change in a DLL that cannot be replaced (8a). Use dllmgr's application-private Wine runtime ([app isolation](https://github.com/unxed/dllmgr/blob/main/docs/app-isolation.md)): a CI-built runtime package can carry patched Unix modules for one program (first group: `win32u.so` + `winex11.so`). Or work around from the program's side: a proxy DLL that the program already imports, installed next to the program with a per-program load order, can hook window messages through public APIs (example: dllmgr `patches/dllmgr-27`, which pre-presents the screen under a newly shown window so no white or black is shown before the first paint).
 4. A rewrite of the module in Bp. Rare. Only when the Wine module does not fit the program by design. Wine will not accept this code, so the upstream report stays text only.
 
 Not fixed by this skill (report only): wineserver, graphics and drivers, timings, DRM and anti-cheat.
 
 ### 8a. DLLs that cannot be replaced
 
-These cannot be replaced with the tools above: DLLs that have a unix part, and core DLLs: `ntdll`, `kernel32`, `kernelbase`, `user32`, `gdi32`, `win32u`, `winex11.drv`. A DLL has a unix part if the Wine installation has a matching `.so` next to its PE modules, for example `ls /usr/lib/*/wine/*-unix/DLL.so /usr/lib/wine/*-unix/DLL.so /opt/wine*/lib/wine/*-unix/DLL.so 2>/dev/null` prints a file. Do not run `override.py` for them. Identify the cause, write the report (step 10) and tell the user that a local fix is not possible yet.
+These cannot be replaced with the tools above: DLLs that have a unix part, and core DLLs: `ntdll`, `kernel32`, `kernelbase`, `user32`, `gdi32`, `win32u`, `winex11.drv`. A DLL has a unix part if the Wine installation has a matching `.so` next to its PE modules, for example `ls /usr/lib/*/wine/*-unix/DLL.so /usr/lib/wine/*-unix/DLL.so /opt/wine*/lib/wine/*-unix/DLL.so 2>/dev/null` prints a file. Do not run `override.py` for them. Identify the cause, write the report (step 10), and use method 3 of step 8 if dllmgr supports the program; otherwise tell the user that a local fix is not possible yet.
 
 ### 9. Minimal reproducer (when you write your own fix or a report)
 
 Write a small C program (mingw) that shows the bug without the application: create the control, send the message, print the result, return a non-zero exit code on the bug. Run it before and after the fix. It is the proof of the bug and the base of the test in the report.
+
+Windows reference behaviour comes from running the same kind of probe on real Windows, for example a `windows-latest` GitHub Actions job: build with mingw on Linux, run on Windows, print one line per case. Make the probe cover argument errors, defaults, reset and last-error values, then make Wine's output identical line by line. This is black-box testing and fits rule 6.
+
+A gate is valid only if it fails on the known-bad variant: before trusting a new test, run it once on the unfixed or deliberately broken build.
+
+`wine: Unimplemented function DLL.Name called` means Wine does not export a function the program imports; the loader bound an aborting stub. Check the current Wine master (`git fetch --depth 1 origin master`), then implement the export with Windows-measured semantics.
 
 Wine constants are often calibrated on default sizes. Example: `LISTVIEW_SCROLL_ICON_LINE_SIZE = 37` is half of the default 74-pixel icon spacing. Native v6 scrolls lines × (item spacing on that axis) / 2 per wheel detent, so with 138×144 cells Wine was about 12× slower at 192 DPI. A fixture with default 32×32 icons passes either way. Calibrate against Windows with the application's real sizes and DPI, and put a non-default size in the fixture.
 
@@ -244,6 +255,8 @@ Wine constants are often calibrated on default sizes. Example: `LISTVIEW_SCROLL_
 Write the report using `templates/bug-report.md`. Fill every section.
 
 Self-check: give a cheaper subagent only the report text and the Wine source tree (no other context, no access to your notes). It must write a patch from the text, the patch must build, and the reproducer must pass. If it fails, the report lacks precision: find what was missing, fix the text, check again.
+
+Retest on the latest Wine before you propose any report or comment. Wine developers want reports against current wine.git; a report against a release that is months old is "not very useful" to them, and the bug may already be fixed. Build the current wine.git master (or the latest development release, if the build is not possible), run the reproducer and the real application there, and write down the commit you tested. If a developer in the ticket names a commit that should fix it, test exactly that commit (and master). Then: still broken → the report says "still present in wine-<version>-<commit>" with the results from that build; fixed → no new report; for a ticket that is already filed, propose a short comment confirming the fix (or what is left) and the commit tested. A report that was filed before this retest gets the same retest afterwards, with an updating comment if the results differ.
 
 Show the final text to the user. Say whether it is a new bug or a comment in ticket N.
 

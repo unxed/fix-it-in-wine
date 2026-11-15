@@ -106,6 +106,7 @@ Use the symptom to choose candidates. The table is a starting point, not a proof
 | Network | winhttp, wininet, ws2_32 |
 | Database access | odbc32, oledb32 |
 | Missing import, load failure | the DLL named in the digest under `missing imports` |
+| A GPU-drawn child window (canvas, video, 3D view) shows old content while it updates | win32u (see "Known case" below) |
 
 Narrow it down:
 
@@ -118,6 +119,9 @@ Narrow it down:
    For a crash use `--preset crash`.
 2. Check from where the DLL is loaded. The digest line `dll comctl32: native|builtin <path>` shows it. If the path is under `winsxs`, the program uses the side-by-side (v6) copy. Note the path.
 3. Release-level bisect. Build the candidate DLL from another tag (step 5), enable it (step 6), run the check (step 7). If the behaviour changes between two releases, the cause is in the commits between them. Compare the tags, then narrow with `git log` and `git bisect` on `dlls/<dll>` in the source tree under `~/.cache/fix-it-in-wine/src/<ref>` (build one commit at a time with `tools/build_one_dll.sh`).
+4. An action that silently leaves the old view on screen (no crash) is often cancelled by a stub. In a `--preset crash` log, look for a fixme on the UI thread (a stub returning `E_NOTIMPL`) followed at once by a C++ exception (`code=e06d7363`) from the program's own module: `info[3]` of the exception is the image base of the throwing module, match it with the `loaddll` lines. A handler near the outer frames of the stack (close to the message loop) means the whole action was unwound. That stub is the candidate. Rule out the rendering path first, cheaply: switch off the program's own GPU acceleration; if the symptom stays, the GPU path is not the cause.
+
+Known case: in Wine 10.0-based builds the server keeps a child window out of the parent's window surface only when it has an OpenGL pixel format (`SET_WINPOS_PIXEL_FORMAT`). A child window with Vulkan surfaces (DXVK or vkd3d-proton swapchains) is not excluded, so window-surface flushes paint old pixels over the presented frames whenever other parts of the window redraw; the frames show again when the redraws stop. Upstream changed this in the client-surface rework (for example `7993d8b86cb9`, "win32u: Fix clipping out of vulkan and other process client surfaces"). The fix belongs in win32u, which has a unix part (step 8a). Confirm the case with the pixmap comparison in step 7 before changing anything.
 
 If you cannot name one DLL with evidence, stop and tell the user what you know.
 
@@ -239,6 +243,7 @@ Measuring from outside:
 - With WineHQ packages (old WoW64) a 32-bit program loads `lib/wine/i386-unix/*.so`; in new-WoW64 builds only `x86_64-unix` exists. Rebuild and test the layout the program actually uses.
 - Reproduce the user's launch path exactly (menu entry, file manager, `wine`, a launcher): an app-private runtime or override applies only to the paths that use it.
 - Accessibility-based desktop automation does not see Wine windows (they expose no AT-SPI tree). Capture a window with `xwd -id WID` (find WID with `wmctrl -l`). Under a compositor, the capture of a covered window contains the windows on top of it: raise it first (`wmctrl -i -a WID`) and give focus back after. Areas the program never paints show stale content (whatever was there before), not black.
+- GPU output in a child window (DXVK, vkd3d-proton, OpenGL) goes to an offscreen X client window (listed under a 1x1 parent in `xwininfo -root -tree`) and Wine copies it into the toplevel on each present. `xwd -id` on such a redirected window returns screen content, not the window's pixels. Read them with `XCompositeNameWindowPixmap` and `XGetImage` on the returned pixmap (Python `ctypes`, no extra packages). Compare that pixmap (what was presented) with the toplevel (what is on screen) at the same moment, sampled about once a second while the user interacts: this separates "renders wrong" from "copied or overwritten wrong". Report how many samples match. Counting how often a region changes in each of the two gives the presented and the displayed frame rate.
 
 ### 8. Order of fix methods
 
@@ -254,6 +259,13 @@ Not fixed by this skill (report only): wineserver, graphics and drivers, timings
 ### 8a. DLLs that cannot be replaced
 
 These cannot be replaced with the tools above: DLLs that have a unix part, and core DLLs: `ntdll`, `kernel32`, `kernelbase`, `user32`, `gdi32`, `win32u`, `winex11.drv`. A DLL has a unix part if the Wine installation has a matching `.so` next to its PE modules, for example `ls /usr/lib/*/wine/*-unix/DLL.so /usr/lib/wine/*-unix/DLL.so /opt/wine*/lib/wine/*-unix/DLL.so 2>/dev/null` prints a file. Do not run `override.py` for them. Identify the cause, write the report (step 10), and use method 3 of step 8 if dllmgr supports the program; otherwise tell the user that a local fix is not possible yet.
+
+When a launcher keeps its runners in a directory of its own (Bottles, Lutris), such a fix can still stay limited to one bottle, with the user's yes:
+
+- Make a hard-linked copy of the runner next to the original (`cp -al`, same filesystem, almost no disk space). In the copy, remove each file you replace before writing it, so the original runner keeps its own file. Keep the builtin mark on PE files: they load as the runner's builtins. The user selects the copy for that one bottle; undo is selecting the original runner again.
+- `WINEDLLPATH` cannot do this: the runner's own library directory is searched first.
+- A rebuilt unix module must have the same optional libraries as the runner's, or fonts or Vulkan break without an error. Configure with the same features, then compare both files: `nm -D --defined-only`, the `NEEDED` entries, the dlopen sonames (`strings FILE | grep '\.so\.'`) and the debug format strings.
+- Verify with the digest (`dll X: builtin` from the copy's path, the missing import gone) and from the launcher itself (`/proc/PID/maps` of the running program shows which files are loaded).
 
 ### 9. Minimal reproducer (when you write your own fix or a report)
 

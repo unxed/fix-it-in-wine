@@ -69,7 +69,7 @@ tools/catalog.py show winehq-59609
 
 If an entry matches the program and the symptom, read it with `show`. It gives the bug, the DLLs, the patch, how to build it and, when present, prebuilt files and a one-step apply. Tell the user which entry it is. Then use it: build with the entry's patch (step 5) or take its prebuilt files (check the sha256), enable (step 6), verify (step 7). If nothing matches, go on with step 2.
 
-If `catalog.py` stops with "the index must be a JSON array of objects", the index is in the format-1 envelope (`{"format": 1, "entries": [...]}`, issue #13). Report that error to the user, then search the `entries` of `index.json` directly.
+The catalog loader accepts both legacy JSON arrays and the current format-1 envelope (`{"format": 1, "entries": [...]}`). Unsupported versions and malformed entries are reported as catalog errors.
 
 ### 2. Baseline digest
 

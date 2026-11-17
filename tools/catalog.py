@@ -47,6 +47,11 @@ def load_index(source):
         entries = json.loads(raw.decode("utf-8"))
     except ValueError:
         raise CatalogError("%s is not a JSON index" % source)
+    if isinstance(entries, dict):
+        version = entries.get("format")
+        if type(version) is not int or version != 1:
+            raise CatalogError("%s: unsupported catalog format %r" % (source, version))
+        entries = entries.get("entries")
     if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
         raise CatalogError("%s: the index must be a JSON array of objects" % source)
     return entries

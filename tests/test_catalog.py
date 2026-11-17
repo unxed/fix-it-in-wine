@@ -99,6 +99,34 @@ class CatalogTest(unittest.TestCase):
         entries = catalog.load_index(self.index_path)
         self.assertEqual([e["id"] for e in entries], [e["id"] for e in SAMPLE])
 
+    def test_current_dllmgr_envelope_search_and_show(self):
+        path = os.path.join(self.tmpdir, "format1.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"format": 1, "entries": SAMPLE}, f)
+        with mock.patch.dict(os.environ, {"FIW_CATALOG": path}):
+            code, out, err = self.run_main(["search", "--program", "FSViewer.exe"])
+            self.assertEqual(code, 0, err)
+            self.assertIn("winehq-59609", out)
+            code, out, err = self.run_main(["show", "winehq-59609"])
+            self.assertEqual(code, 0, err)
+            self.assertIn("programs: FSViewer.exe", out)
+
+    def test_rejects_unsupported_envelope_version(self):
+        path = os.path.join(self.tmpdir, "future.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"format": 2, "entries": SAMPLE}, f)
+        with self.assertRaisesRegex(catalog.CatalogError, "unsupported catalog format"):
+            catalog.load_index(path)
+
+    def test_rejects_invalid_envelope_entries(self):
+        path = os.path.join(self.tmpdir, "bad-entries.json")
+        for entries in (None, {}, ["not an object"]):
+            with self.subTest(entries=entries):
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump({"format": 1, "entries": entries}, f)
+                with self.assertRaises(catalog.CatalogError):
+                    catalog.load_index(path)
+
     def test_load_rejects_non_array(self):
         path = os.path.join(self.tmpdir, "object.json")
         with open(path, "w", encoding="utf-8") as f:
